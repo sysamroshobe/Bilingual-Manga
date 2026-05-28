@@ -11,7 +11,7 @@ json/BM_data.manga_data.json
 json/BM_data.manga_metadata.json
 
 # Keep these in repo
-database-json.zip
+!database-json.zip
 !json/dw.json
 
 .env
