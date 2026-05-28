@@ -34,14 +34,8 @@ This creates:
 npm install
 ```
 
-## 4) Run locally (2 terminals)
+## 4) Run locally (fullstack, one command)
 
-Terminal A (backend):
-```powershell
-node app.js
-```
-
-Terminal B (frontend):
 ```powershell
 npm run dev
 ```

@@ -8,9 +8,7 @@ Source code of bilingual manga(home), packaged for local hosting after clone/pul
    - `npm install`
 2. Extract bundled database files:
    - `npm run db:extract`
-3. Run backend (terminal 1):
-   - `node app.js`
-4. Run frontend (terminal 2):
+3. Run fullstack dev (backend + frontend together):
    - `npm run dev`
 
 Open `http://localhost:5173`.
