@@ -19,6 +19,14 @@ cd Bilingual_Manga-home--src-
 
 The repo tracks `database-json.zip` and excludes extracted large JSON from git.
 
+### Why this is done
+
+- The big files (`json/BM_data.manga_data.json`, etc.) are not stored directly in git history.
+- Instead, the repo stores `database-json.zip`.
+- After cloning/pulling, you run `npm run db:extract` to recreate those JSON files locally.
+- This keeps the repo cleaner and avoids huge tracked JSON churn.
+- It still lets everyone get the needed DB from one bundled file in the repo.
+
 ```powershell
 npm run db:extract
 ```
