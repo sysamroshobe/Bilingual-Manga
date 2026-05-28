@@ -1,0 +1,17 @@
+node_modules/
+.svelte-kit/
+build/
+.ipfs/
+ipfs/
+ocr/
+manga_cover/
+
+# Large extracted DB files are generated from database-json.zip
+json/BM_data.manga_data.json
+json/BM_data.manga_metadata.json
+
+# Keep these in repo
+database-json.zip
+!json/dw.json
+
+.env
