@@ -2,7 +2,7 @@
 import fs from "fs"
 import cors from "cors"
 import fetch from "node-fetch"
-import { findTitleById, resolveIpfsGate } from "./src/lib/ipfs-gate.js"
+import { findTitleById, localIpfsGate, remoteIpfsPrefix, resolveIpfsGate, toLocalIpfsPath } from "./src/lib/ipfs-gate.js"
 
 import express from "express"
 import { fileURLToPath } from 'url';
@@ -88,13 +88,17 @@ app.use('/check',(req,res)=>{imgdl("pm")});
 
 app.use('/remove',(req, res) => {
   let ob=req.body
-  let x11=manob["meta"].manga_titles
-  let x12=reverseArray(x11)
-    //namarr={}
+  const meta = manob["meta"]
+  if (!meta?.manga_titles) {
+    res.status(503).send('Metadata not ready yet')
+    return
+  }
+  let x12=reverseArray(meta.manga_titles)
   fs.readFile('./json/dw.json', 'utf8', function(err, contents) {
     if (err) {
-      throw err;
-    } else {
+      res.status(500).send('failed')
+      return
+    }
       let data = JSON.parse(contents);
       const selectedIds = selectedIdsFromPayload(ob, x12);
       selectedIds.forEach((id) => {
@@ -102,15 +106,16 @@ app.use('/remove',(req, res) => {
           data["rm"].push(id);
         }
       });
-      fs.writeFile ("./json/dw.json", JSON.stringify(data), function(err) {
-        if (err) throw err;
+      fs.writeFile ("./json/dw.json", JSON.stringify(data), function(writeErr) {
+        if (writeErr) {
+          res.status(500).send('failed')
+          return
+        }
+        imgdl("rm")
+        res.send("ok")
         });
 
-    }
-});
-
-  imgdl("rm")
-  res.send("ok")
+  });
 
 });
 
@@ -119,13 +124,18 @@ app.use('/remove',(req, res) => {
 app.use('/download',(req, res) => {
 
   let ob=req.body
-  let x11=manob["meta"].manga_titles
-  let x12=reverseArray(x11)
+  const meta = manob["meta"]
+  if (!meta?.manga_titles) {
+    res.status(503).send('Metadata not ready yet')
+    return
+  }
+  let x12=reverseArray(meta.manga_titles)
 
   fs.readFile('./json/dw.json', 'utf8', function(err, contents) {
     if (err) {
-      throw err;
-    } else {
+      res.status(500).send('failed')
+      return
+    }
       let data = JSON.parse(contents);
       const selectedIds = selectedIdsFromPayload(ob, x12);
       selectedIds.forEach((id) => {
@@ -133,16 +143,16 @@ app.use('/download',(req, res) => {
           data["dw"].push(id);
         }
       });
-      fs.writeFile ("./json/dw.json", JSON.stringify(data), function(err) {
-        if (err) throw err;
+      fs.writeFile ("./json/dw.json", JSON.stringify(data), function(writeErr) {
+        if (writeErr) {
+          res.status(500).send('failed')
+          return
+        }
+        imgdl("dw")
+        res.send("ok")
         });
 
-    }
-});
-
-  imgdl("dw")
-  res.send("ok")
-  
+  });
 
 });
 
@@ -168,6 +178,33 @@ async function downloadCover(cdn, path) {
     stream.on('error', reject)
     temp1.body.on('error', reject)
   })
+}
+
+async function writeRemoteFile(remoteUrl, localPath) {
+  try {
+    const decodedPath = decodeURIComponent(decodeURIComponent(localPath))
+    const dir = decodedPath.split('/').slice(0, -1).join('/')
+    if (dir && !fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true })
+    }
+    if (fs.existsSync(decodedPath)) return
+
+    const temp1 = await fetch(remoteUrl)
+    if (!temp1.ok) {
+      console.warn(`Download skipped (${temp1.status}): ${remoteUrl}`)
+      return
+    }
+
+    await new Promise((resolve, reject) => {
+      const stream = fs.createWriteStream(decodedPath)
+      temp1.body.pipe(stream)
+      stream.on('finish', resolve)
+      stream.on('error', reject)
+      temp1.body.on('error', reject)
+    })
+  } catch (e) {
+    console.warn(`Download skipped (${localPath}):`, e.message)
+  }
 }
 
 async function fetc(){
@@ -242,19 +279,19 @@ function imgdl(sel){
             
             pm.push(idd)
             const titleEntry = findTitleById(manob["meta"], idd)
-            ipfsgate = resolveIpfsGate(manob["meta"], titleEntry)
+            const remoteGate = resolveIpfsGate(manob["meta"], titleEntry)
+            const savedGate = ipfsgate
+            ipfsgate = localIpfsGate(manob["meta"])
             let xxx122=mdata[ii].en_data["ch_en"]
             let xxx122h=mdata[ii].en_data["ch_enh"]
             let imgs_engo=imgscon(xxx122,xxx122h);
             let imgs_jpo=imgscon(mdata[ii].jp_data.ch_jp,mdata[ii].jp_data.ch_jph);
-            imgox(imgs_engo)
-            imgox(imgs_jpo,true)
+            ipfsgate = savedGate
+            imgox(imgs_engo, false, remoteGate)
+            imgox(imgs_jpo, true, remoteGate)
             async function fetc1(patt,patt1,ocrtt=false){
               for(let ii in patt)
               {
-              let pat2 = patt1[ii].split("/");
-              let pat3 = pat2.slice(0, pat2.length-1).join("/");
-
               let cid=patt[ii].split('/');
               let seljs=3;
               if(`${cid[(cid.length-seljs)]}`==='ipfs')
@@ -265,31 +302,15 @@ function imgdl(sel){
               if(ocrtt){
               let ocr=`${manob["meta"].cdn}/ocr/${cid[(cid.length-seljs)]}.json`
               let ocrp=`./ocr/${cid[(cid.length-seljs)]}.json`
-              if(!fs.existsSync('./ocr/'))
-              {fs.mkdirSync('./ocr/', { recursive: true });}
-
-              if(!fs.existsSync(ocrp))
-              {const temp1=await fetch(ocr)
-                ocrp=decodeURIComponent(decodeURIComponent(ocrp))
-                //console.log(ocrp)
-              const temp2=await temp1.body.pipe(fs.createWriteStream(ocrp))
-             }}
-
-              if (!fs.existsSync(pat3)){
-                fs.mkdirSync(pat3, { recursive: true });
-                
-               }
-               if(!fs.existsSync(patt1[ii]))
-              {const temp1=await fetch(patt[ii])
-                patt1[ii]=decodeURIComponent(decodeURIComponent(patt1[ii]))
-                //console.log(patt1[ii])
-              const temp2=await temp1.body.pipe(fs.createWriteStream(patt1[ii]))
+              await writeRemoteFile(ocr, ocrp)
              }
+
+              await writeRemoteFile(patt[ii], patt1[ii])
             }
             
             }
 
-          function imgox(imgs_engo,ocrtt=false){
+          function imgox(imgs_engo,ocrtt=false,remoteGate=""){
             let patt=[]
             let patt1=[]
             let patt3=[]
@@ -300,10 +321,10 @@ function imgdl(sel){
               {
 
                 let pat0=vol[xnnn]
-                let pat1=`.${pat0.replace("http://localhost:3300","")}`
+                let pat1=toLocalIpfsPath(pat0)
                 let pat2 = pat1.split("/");
                 let pat3 = pat2.slice(0, pat2.length-1).join("/");
-                let ipfsgatemm=ipfsgate.replace("%@cid@%","")
+                let ipfsgatemm=remoteIpfsPrefix(remoteGate || ipfsgate)
                 let pat4=`${ipfsgatemm}${pat1.replace("./ipfs/","")}`
                 //console.log(pat4)
 
@@ -377,5 +398,6 @@ function imgdl(sel){
 
 
 }
-  fetc().catch((e) => console.warn('fetc() failed:', e.message))
-  imgdl()
+  fetc()
+    .catch((e) => console.warn('fetc() failed:', e.message))
+    .finally(() => imgdl())
