@@ -2,6 +2,7 @@
 import fs from "fs"
 import cors from "cors"
 import fetch from "node-fetch"
+import { findTitleById, resolveIpfsGate } from "./src/lib/ipfs-gate.js"
 
 import express from "express"
 import { fileURLToPath } from 'url';
@@ -240,6 +241,8 @@ function imgdl(sel){
           {
             
             pm.push(idd)
+            const titleEntry = findTitleById(manob["meta"], idd)
+            ipfsgate = resolveIpfsGate(manob["meta"], titleEntry)
             let xxx122=mdata[ii].en_data["ch_en"]
             let xxx122h=mdata[ii].en_data["ch_enh"]
             let imgs_engo=imgscon(xxx122,xxx122h);
@@ -300,9 +303,7 @@ function imgdl(sel){
                 let pat1=`.${pat0.replace("http://localhost:3300","")}`
                 let pat2 = pat1.split("/");
                 let pat3 = pat2.slice(0, pat2.length-1).join("/");
-                while(!(manob["meta"].ipfsgate.length>0))
-                {}
-                let ipfsgatemm=manob["meta"].ipfsgate.replace("%@cid@%","")
+                let ipfsgatemm=ipfsgate.replace("%@cid@%","")
                 let pat4=`${ipfsgatemm}${pat1.replace("./ipfs/","")}`
                 //console.log(pat4)
 

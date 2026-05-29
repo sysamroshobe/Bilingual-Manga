@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit';
 import db from '$lib/db';
+import { findTitleById, resolveIpfsGate } from '$lib/ipfs-gate.js';
 import { ObjectId } from 'mongodb';
 
 /** @type {import('./$types').PageServerLoad} */
@@ -31,6 +32,10 @@ export async function load({ params, url, parent }) {
 
   if (!ObjectId.isValid(id)) {
     throw error(404, 'Not found');
+  }
+
+  if (!matchedTitle) {
+    matchedTitle = findTitleById(meta[0], id);
   }
 
   const man = db.manga_data;
@@ -69,12 +74,7 @@ export async function load({ params, url, parent }) {
   const aa2 = await aa1.json();
   const pm = aa2.pm ?? [];
 
-  if (pm.includes(id)) {
-    ipfsss = meta[0].ipfsgate1;
-  } else {
-    const gates = meta[0].ipfsgate;
-    ipfsss = Array.isArray(gates) ? gates[0] : gates;
-  }
+  ipfsss = resolveIpfsGate(meta[0], matchedTitle, { preferLocal: pm.includes(id) });
 
   return {
     p: id,
